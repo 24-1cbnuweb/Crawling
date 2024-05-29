@@ -19,9 +19,6 @@ def extract_weights(text, price):
     # 정규식을 사용하여 일치하는 모든 패턴을 찾기
     matches = re.findall(pattern, text, re.IGNORECASE)
     
-    # # 디버깅용으로 matches 내용 출력
-    # print("Matches found:", matches)
-    
     # per 변수 초기화
     per = 'coming soon'
     
@@ -35,7 +32,10 @@ def extract_weights(text, price):
             gramPrice = price / weight
             per = int(gramPrice * 100)  # 100g당 가격
     
-    return per
+    # 가격을 콤마로 구분하고 '원'을 추가하여 문자열로 변환
+    per_price_str = f"{per:,}원" if isinstance(per, (int, float)) else per
+    
+    return per_price_str
 
 # kurly page number 가져오기
 def get_page_number(URL):
@@ -105,6 +105,8 @@ def getPageOfKurlyItems(Kurly_URL):
         src = img[0].get_attribute('src')
         imgLink = src if src and not src.startswith('data:image') else 0
         itemLink = item.get_attribute('href')
+        if not itemLink.startswith("https"):
+            itemLink = itemLink.replace("kurly.com", "")
         price = item.find_element(By.CSS_SELECTOR,".sales-price.css-18tpqqq.ei5rudb1").text
         weightPerUnit = extract_weights(title, price)
 
@@ -127,7 +129,7 @@ def getPageOfKurlyItems(Kurly_URL):
                 # "카테고리" : catagory,
                 # "과일 종류" : production,
                 "이미지 주소" : imgLink,
-                "상품 주소" : f"kurly.com{itemLink}",
+                "상품 주소" : itemLink,
                 "가격" : price,
                 "할인률" : percent,
                 "원가격" : realPrice,
@@ -172,7 +174,7 @@ def kurly_crawling(URL):
     finalItems = myKurlyItems(allItems)
     return finalItems
 
-#coupang crawling function
+# Coupang 크롤링 함수
 def C_get_partItems(URL):
     print(f"Scrapping {URL}........\n")
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36", "Accept-Language": "ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3"}
@@ -184,8 +186,6 @@ def C_get_partItems(URL):
     for page in soup.find_all("li", class_=["baby-product", "renew-badge"]):
         title = page.find("dd", class_="descriptions").find("div", class_="name").text.strip()
         site = "coupang"
-        # catagory = Catagory
-        # production = keyword
         imgLink = page.find("img").get('src')
         itemLink = page.find("a", class_="baby-product-link").get('href')
         price = page.find("strong", class_="price-value").text.strip()
@@ -202,16 +202,15 @@ def C_get_partItems(URL):
         em = []
         if pricePerGram:
             em = pricePerGram.find_all("em")
-        else :
+        else:
             ver2_pricePerGram = extract_weights(title, price)
 
+        # 상품 주소와 이미지 주소에 각각 "https://www." 및 "https://" 추가
         item_data = {
             "이름": title,
             "사이트": site,
-            # "카테고리": catagory,
-            # "과일 종류": production,
-            "이미지 주소": imgLink,
-            "상품 주소": f"coupang.com/{itemLink}",
+            "이미지 주소": f"https:{imgLink}" if imgLink.startswith("//") else imgLink,
+            "상품 주소": f"https://www.coupang.com{itemLink}",
             "가격": price,
             "할인률": percent.text if percent else "0%",
             "원가격": realPrice_num if realPrice else price,
@@ -277,9 +276,13 @@ domestic_fruits = df[df["카테고리"].str.contains("국내", na=False)]
 foreign_fruits = df[df["카테고리"].str.contains("외국", na=False)]
 frozen_fruits = df[df["카테고리"].str.contains("냉동", na=False)]
 
+delete_domestic_keywords = ['칠레', '미국', '페루', '그리스', '터키', '이집트', '중국', '캐나다', '일본', '남미', '호주', '수입', '항공', '캘리포니아', '워싱턴', '닝샤', '알파인레드', '장백산', '엘라그산', '플라스틱', '따기']
+mask = domestic_fruits.apply(lambda x: x.str.contains('|'.join(delete_domestic_keywords))).any(axis=1)
+final_domestic_fruits = domestic_fruits[~mask]
+
 # 엑셀 파일로 저장
 df.to_excel('All Fruit Data.xlsx', index=False)
-domestic_fruits.to_excel('Domestic Fruit Data.xlsx', index=False)
+final_domestic_fruits.to_excel('Domestic Fruit Data.xlsx', index=False)
 foreign_fruits.to_excel('Foreign Fruit Data.xlsx', index=False)
 frozen_fruits.to_excel('Frozen Fruit Data.xlsx', index=False)
 
