@@ -212,7 +212,7 @@ def C_get_partItems(URL):
         item_data = {
             "name": title,
             "site": site,
-            "ime": f"https:{imgLink}" if imgLink.startswith("//") else imgLink,
+            "img": f"https:{imgLink}" if imgLink.startswith("//") else imgLink,
             "url": f"https://www.coupang.com{itemLink}",
             "price": price,
             "discount": percent.text if percent else "0%",
