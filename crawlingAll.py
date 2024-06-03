@@ -7,7 +7,8 @@ import re
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
-# 단위당 가격 계산 함수
+import re
+
 def extract_weights(text, price):
     # price 문자열에서 끝에 있는 '원'과 ',' 제거 후 실수형으로 변환
     price = price.replace(',', '').replace('~', '').rstrip('원')
@@ -25,17 +26,20 @@ def extract_weights(text, price):
     for match in matches:
         if match[1].lower() == 'kg':  # 대소문자 구분 없이 비교
             weight = float(match[0]) * 1000  # kg를 g로 변환
-            gramPrice = price / weight
-            per = int(gramPrice * 100)  # 100g당 가격
         elif match[1].lower() == 'g':
             weight = float(match[0])
-            gramPrice = price / weight
-            per = int(gramPrice * 100)  # 100g당 가격
+        
+        if weight == 0:
+            return per  # weight가 0이면 'coming soon' 반환
+        
+        gramPrice = price / weight
+        per = int(gramPrice * 100)  # 100g당 가격
     
     # 가격을 콤마로 구분하고 '원'을 추가하여 문자열로 변환
     per_price_str = f"{per:,}원" if isinstance(per, (int, float)) else per
     
     return per_price_str
+
 
 # kurly page number 가져오기
 def get_page_number(URL):
@@ -98,7 +102,7 @@ def getPageOfKurlyItems(Kurly_URL):
     newItem_data = []
     for btn, item in zip(button, items):
         title = item.find_element(By.CSS_SELECTOR, ".css-1dry2r1.e1c07x485").text
-        site = "kurly"
+        site = "마켓컬리"
         # catagory = "."
         # production = "."
         img = item.find_elements(By.CSS_SELECTOR, ".css-1zjvv7")
@@ -124,18 +128,17 @@ def getPageOfKurlyItems(Kurly_URL):
 
         if btn.text.strip() != "재입고 알림":   
             newItem_data = {
-                "이름" : title,
-                "사이트" : site,
-                # "카테고리" : catagory,
-                # "과일 종류" : production,
-                "이미지 주소" : imgLink,
-                "상품 주소" : itemLink,
-                "가격" : price,
-                "할인률" : percent,
-                "원가격" : realPrice,
-                "단위가격" : weightPerUnit,
-            }         
-            newItem.append(newItem_data)
+                "name" : title,
+                "site" : site,
+                "img" : imgLink,
+                "url" : itemLink,
+                "price" : price,
+                "discount" : percent,
+                "preprice" : realPrice,
+                "perprice" : weightPerUnit,
+            }
+            if newItem_data["perprice"] != 'coming soon':
+                newItem.append(newItem_data)
         
     driver.quit()
     return newItem
@@ -156,12 +159,12 @@ def myKurlyItems(allItems):
     keyword_list = df["카테고리"].to_list()
     for item in allItems:
         for keyword in keyword_list:
-            if keyword in item["이름"] and "재배" not in item["이름"]:
+            if keyword in item["name"] and "재배" not in item["name"]:
                 category = df[df["카테고리"].str.contains(keyword, case=False, na=False)].values.tolist()
                 for cat in category:
                     newItem = item.copy()  # 항목을 복사하여 각각 다른 카테고리로 저장
-                    newItem["카테고리"] = cat[1]
-                    newItem["과일 종류"] = cat[0]
+                    newItem["category"] = cat[1]
+                    newItem["incategory"] = cat[0]
                     finalItemList.append(newItem)
 
     return finalItemList
@@ -185,7 +188,7 @@ def C_get_partItems(URL):
     items = []
     for page in soup.find_all("li", class_=["baby-product", "renew-badge"]):
         title = page.find("dd", class_="descriptions").find("div", class_="name").text.strip()
-        site = "coupang"
+        site = "쿠팡"
         imgLink = page.find("img").get('src')
         itemLink = page.find("a", class_="baby-product-link").get('href')
         price = page.find("strong", class_="price-value").text.strip()
@@ -207,16 +210,17 @@ def C_get_partItems(URL):
 
         # 상품 주소와 이미지 주소에 각각 "https://www." 및 "https://" 추가
         item_data = {
-            "이름": title,
-            "사이트": site,
-            "이미지 주소": f"https:{imgLink}" if imgLink.startswith("//") else imgLink,
-            "상품 주소": f"https://www.coupang.com{itemLink}",
-            "가격": price,
-            "할인률": percent.text if percent else "0%",
-            "원가격": realPrice_num if realPrice else price,
-            "단위가격": em[1].text if pricePerGram else ver2_pricePerGram,
+            "name": title,
+            "site": site,
+            "ime": f"https:{imgLink}" if imgLink.startswith("//") else imgLink,
+            "url": f"https://www.coupang.com{itemLink}",
+            "price": price,
+            "discount": percent.text if percent else "0%",
+            "preprice": realPrice_num if realPrice else price,
+            "perprice": em[1].text if pricePerGram else ver2_pricePerGram,
         }
-        items.append(item_data)
+        if item_data["perprice"] != 'coming soon':
+            items.append(item_data)
     return items
 
 # 카테고리의 아이템 가져오기
@@ -235,10 +239,10 @@ def C_get_CategoryItems(URL, keyword):
             count += 1
     
     for Item in allCategoryItems:
-        if keyword in Item["이름"] and "재배" not in Item["이름"] and "배송" not in Item["이름"]:
+        if keyword in Item["name"] and "재배" not in Item["name"] and "배송" not in Item["name"]:
             category = df[df["카테고리"].str.contains(keyword, case=False, na=False)].values.tolist()
-            Item["카테고리"] = category[0][1]
-            Item["과일 종류"] = category[0][0]
+            Item["category"] = category[0][1]
+            Item["incategory"] = category[0][0]
             finalCategoryItems.append(Item)
 
     # print(len(finalCategoryItems))
@@ -258,12 +262,18 @@ def coupang_crawling(URL):
 
     return allItems
 
+# 인덱스를 재설정하여 번호 부여하는 함수 정의
+def reset_and_assign_id(df):
+    df = df.reset_index(drop=True).reset_index().rename(columns={'index': 'id'})
+    df['id'] = df['id'] + 1  # 번호를 1부터 시작하도록 조정
+    return df
+
 # main
 kruly_URL = "https://www.kurly.com/categories/908"
 coupang_URL = "https://www.coupang.com/np/categories"
 kurlyItmes = []
 coupangItems = []
-keyList = ["이름", "사이트", "카테고리", "과일 종류", "이미지 주소", "상품 주소", "가격", "할인률", "원가격", "단위가격"]
+keyList = ["name", "site", "category", "incategory", "img", "url", "price", "discount", "preprice", "perprice"]
 kurlyItems = kurly_crawling(kruly_URL)
 coupangItems = coupang_crawling(coupang_URL)
 allItems = kurlyItems + coupangItems
@@ -272,18 +282,26 @@ print(len(allItems))
 df = pd.DataFrame(allItems, columns=keyList)
 
 # 카테고리에 따라 필터링
-domestic_fruits = df[df["카테고리"].str.contains("국내", na=False)]
-foreign_fruits = df[df["카테고리"].str.contains("외국", na=False)]
-frozen_fruits = df[df["카테고리"].str.contains("냉동", na=False)]
+domestic_fruits = df[df["category"].str.contains("국내", na=False)]
+foreign_fruits = df[df["category"].str.contains("외국", na=False)]
+frozen_fruits = df[df["category"].str.contains("냉동", na=False)]
 
-delete_domestic_keywords = ['칠레', '미국', '페루', '그리스', '터키', '이집트', '중국', '캐나다', '일본', '남미', '호주', '수입', '항공', '캘리포니아', '워싱턴', '닝샤', '알파인레드', '장백산', '엘라그산', '플라스틱', '따기']
+delete_domestic_keywords = ['칠레', '미국', '페루', '그리스', '터키', '이집트', '중국', '캐나다', '일본', '남미', '호주', '수입', '항공', '캘리포니아', '워싱턴', '닝샤', '알파인레드', '장백산', '엘라그산', '플라스틱', '따기', '냉동', '착즙기', '압착기', '홀로그램', '포장박스', '리필캔', '씨앗']
 mask = domestic_fruits.apply(lambda x: x.str.contains('|'.join(delete_domestic_keywords))).any(axis=1)
 final_domestic_fruits = domestic_fruits[~mask]
+
+delete_foreign_keywords = ['냉동', '착즙기', '압착기', '플라스틱', '씨앗']
+mask2 = foreign_fruits.apply(lambda x: x.str.contains('|'.join(delete_foreign_keywords))).any(axis=1)
+final_foreign_fruits = foreign_fruits[~mask2]
+
+final_domestic_fruits = reset_and_assign_id(final_domestic_fruits)
+final_foreign_fruits = reset_and_assign_id(final_foreign_fruits)
+frozen_fruits = reset_and_assign_id(frozen_fruits)
 
 # 엑셀 파일로 저장
 df.to_excel('All Fruit Data.xlsx', index=False)
 final_domestic_fruits.to_excel('Domestic Fruit Data.xlsx', index=False)
-foreign_fruits.to_excel('Foreign Fruit Data.xlsx', index=False)
+final_foreign_fruits.to_excel('Foreign Fruit Data.xlsx', index=False)
 frozen_fruits.to_excel('Frozen Fruit Data.xlsx', index=False)
 
 print("All Fruit Data 파일이 성공적으로 생성되었습니다.")
