@@ -286,24 +286,28 @@ domestic_fruits = df[df["category"].str.contains("국내", na=False)]
 foreign_fruits = df[df["category"].str.contains("외국", na=False)]
 frozen_fruits = df[df["category"].str.contains("냉동", na=False)]
 
-delete_domestic_keywords = ['칠레', '미국', '페루', '그리스', '터키', '이집트', '중국', '캐나다', '일본', '남미', '호주', '수입', '항공', '캘리포니아', '워싱턴', '닝샤', '알파인레드', '장백산', '엘라그산', '플라스틱', '따기', '냉동', '착즙기', '압착기', '홀로그램', '포장박스', '리필캔', '씨앗', '아닙니다']
+delete_domestic_keywords = ['칠레', '미국', '페루', '그리스', '터키', '이집트', '중국', '캐나다', '일본', '남미', '호주', '수입', '항공', '캘리포니아', '워싱턴', '닝샤', '알파인레드', '장백산', '엘라그산', '플라스틱', '따기', '냉동', '착즙기', '압착기', '홀로그램', '포장박스', '리필캔', '씨앗', '아닙니다', '건포도']
 mask = domestic_fruits.apply(lambda x: x.str.contains('|'.join(delete_domestic_keywords))).any(axis=1)
 final_domestic_fruits = domestic_fruits[~mask]
 
-delete_foreign_keywords = ['냉동', '착즙기', '압착기', '플라스틱', '씨앗']
+delete_foreign_keywords = ['냉동', '착즙기', '압착기', '플라스틱', '씨앗', '레몬글라스', '푸레', '퓨레', '제주']
 mask2 = foreign_fruits.apply(lambda x: x.str.contains('|'.join(delete_foreign_keywords))).any(axis=1)
 final_foreign_fruits = foreign_fruits[~mask2]
 
+delete_frozen_keywords = ['카사바', '삶은감자', '퓨레', '후르츠']
+mask3 = frozen_fruits.apply(lambda x: x.str.contains('|'.join(delete_frozen_keywords))).any(axis=1)
+final_frozen_fruits = frozen_fruits[~mask3]
+
 final_domestic_fruits = reset_and_assign_id(final_domestic_fruits)
 final_foreign_fruits = reset_and_assign_id(final_foreign_fruits)
-frozen_fruits = reset_and_assign_id(frozen_fruits)
+final_frozen_fruits = reset_and_assign_id(final_frozen_fruits)
 df = reset_and_assign_id(df)
 
 # 엑셀 파일로 저장
 df.to_excel('All Fruit Data.xlsx', index=False)
 final_domestic_fruits.to_excel('Domestic Fruit Data.xlsx', index=False)
 final_foreign_fruits.to_excel('Foreign Fruit Data.xlsx', index=False)
-frozen_fruits.to_excel('Frozen Fruit Data.xlsx', index=False)
+final_frozen_fruits.to_excel('Frozen Fruit Data.xlsx', index=False)
 
 print("All Fruit Data 파일이 성공적으로 생성되었습니다.")
 print("Domestic, Foreign, Frozen Fruit Data 파일이 성공적으로 생성되었습니다.")
